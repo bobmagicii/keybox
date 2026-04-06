@@ -107,6 +107,9 @@ extends Common\Prototype {
 	FromFile(string $Filename):
 	static {
 
+		if(!is_file($Filename))
+		touch($Filename);
+
 		$Output = new static;
 		$Output->Read($Filename);
 

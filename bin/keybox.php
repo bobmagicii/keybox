@@ -3,10 +3,6 @@
 
 $AppRoot = dirname(__FILE__, 2);
 
-if(Phar::Running()) {
-	$AppRoot = dirname(__FILE__);
-}
-
 require(sprintf('%s/vendor/autoload.php', $AppRoot));
 
 use Nether\Console;
@@ -130,17 +126,14 @@ extends Console\Client {
 		return 0;
 	}
 
-	#[Console\Meta\Command('list')]
+	#[Console\Meta\Command('hosts')]
 	public function
-	CmdList():
+	CmdHosts():
 	int {
 
 		$Path = (FALSE
 			?: $this->GetOption('path')
-			?: Common\Filesystem\Util::Pathify(
-				$this->GetUserPath('.ssh'),
-				'keybox.hosts.conf'
-			)
+			?: $this->GetHostFile()
 		);
 
 		$Conf = Local\HostConf::FromFile($Path);
@@ -164,6 +157,35 @@ extends Console\Client {
 		return 0;
 	}
 
+	#[Console\Meta\Command('keys')]
+	public function
+	CmdKeys():
+	int {
+
+		$Path = (FALSE
+			?: $this->GetOption('path')
+			?: $this->GetHostFile()
+		);
+
+		Console\Elements\ListNamed::New(
+			Client: $this,
+			Items: [
+				'Keys' => $this->GetKeyRoot()
+			],
+			Print: 2
+		);
+
+		$Keys = $this->FindInstalledKeys();
+
+		Console\Elements\ListOrdered::New(
+			Client: $this,
+			Items: $Keys->Export(),
+			Print: 2
+		);
+
+		return 0;
+	}
+
 	#[Console\Meta\Command('set')]
 	#[Console\Meta\Arg('host')]
 	#[Console\Meta\Error(1, 'no host specified')]
@@ -173,10 +195,7 @@ extends Console\Client {
 
 		$Path = (FALSE
 			?: $this->GetOption('path')
-			?: Common\Filesystem\Util::Pathify(
-				$this->GetUserPath('.ssh'),
-				'keybox.hosts.conf'
-			)
+			?: $this->GetHostFile()
 		);
 
 		$Host = $this->GetInput(1);
@@ -238,10 +257,7 @@ extends Console\Client {
 
 		$Path = (FALSE
 			?: $this->GetOption('path')
-			?: Common\Filesystem\Util::Pathify(
-				$this->GetUserPath('.ssh'),
-				'keybox.hosts.conf'
-			)
+			?: $this->GetHostFile()
 		);
 
 		$Host = $this->GetInput(1);
@@ -262,6 +278,7 @@ extends Console\Client {
 	////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////
 
+	#[Common\Meta\Info('return path within user directory.')]
 	protected function
 	GetUserPath(string $To):
 	string {
@@ -272,9 +289,16 @@ extends Console\Client {
 		return $Path;
 	}
 
+	#[Common\Meta\Info('return path to managed key directory.')]
 	protected function
 	GetKeyRoot():
 	string {
+
+		if(Phar::Running())
+		return Common\Filesystem\Util::Pathify(
+			str_replace('phar://', '', dirname($this->AppRoot)),
+			'keys'
+		);
 
 		return Common\Filesystem\Util::Pathify(
 			$this->AppRoot,
@@ -282,6 +306,7 @@ extends Console\Client {
 		);
 	}
 
+	#[Common\Meta\Info('return path to a private key.')]
 	protected function
 	GetKeyFilePrivate(string $KName):
 	string {
@@ -293,6 +318,7 @@ extends Console\Client {
 		);
 	}
 
+	#[Common\Meta\Info('return path to a public key.')]
 	protected function
 	GetKeyFilePublic(string $KName):
 	string {
@@ -304,6 +330,18 @@ extends Console\Client {
 		);
 	}
 
+	#[Common\Meta\Info('return path to managed host configuration file.')]
+	protected function
+	GetHostFile():
+	string {
+
+		return Common\Filesystem\Util::Pathify(
+			$this->GetKeyRoot(),
+			'hosts.conf'
+		);
+	}
+
+	#[Common\Meta\Info('check if a file looks like a private key.')]
 	protected function
 	IsFilePrivateKey(string $File):
 	bool {
@@ -328,6 +366,7 @@ extends Console\Client {
 		return TRUE;
 	}
 
+	#[Common\Meta\Info('check if a file looks like a public key.')]
 	protected function
 	IsFilePublicKey(string $File):
 	bool {
@@ -355,12 +394,18 @@ extends Console\Client {
 	////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////
 
+	#[Common\Meta\Info('return list of key-pair directories.')]
 	public function
 	FindInstalledKeys():
 	Common\Datastore {
 
 		$Index = Common\Filesystem\Indexer::DatastoreFromPath(
 			$this->KeyRoot
+		);
+
+		$Index->Filter(
+			fn(string $P)
+			=> is_dir($P)
 		);
 
 		$Index->Remap(
@@ -373,6 +418,7 @@ extends Console\Client {
 		return $Index;
 	}
 
+	#[Common\Meta\Info('find paired keys within specified path.')]
 	public function
 	FindKeyFilePairs(string $Path):
 	Common\Datastore {
@@ -402,6 +448,7 @@ extends Console\Client {
 		return $Pairs;
 	}
 
+	#[Common\Meta\Info('find a public key that pairs with a public key.')]
 	public function
 	FindMatchingPublicKey(string $File):
 	?string {
@@ -428,6 +475,7 @@ extends Console\Client {
 	////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////
 
+	#[Common\Meta\Info('copy key pair into managed directory.')]
 	protected function
 	InstallKeyPair(string $Name, Local\KeyFilePair $Pair, bool $Force=FALSE):
 	void {
@@ -455,6 +503,38 @@ extends Console\Client {
 		);
 
 		return;
+	}
+
+	////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////
+
+	protected function
+	GetPharFiles():
+	Common\Datastore {
+
+		$Index = parent::GetPharFiles();
+
+		$Index->Push('core');
+
+		return $Index;
+	}
+
+	protected function
+	GetPharFileFilters():
+	Common\Datastore {
+
+		$Output = parent::GetPharFileFilters();
+
+		$Output->Push(fn(string $Path)=> !str_starts_with($Path, 'vendor/monolog'));
+		$Output->Push(fn(string $Path)=> !str_starts_with($Path, 'vendor/dealerdirect'));
+		$Output->Push(fn(string $Path)=> !str_starts_with($Path, 'vendor/fileeye'));
+		$Output->Push(fn(string $Path)=> !str_starts_with($Path, 'vendor/squizlabs'));
+		$Output->Push(fn(string $Path)=> !str_starts_with($Path, 'vendor/fileeye'));
+		$Output->Push(fn(string $Path)=> !str_starts_with($Path, 'vendor/psr'));
+		$Output->Push(fn(string $Path)=> !str_starts_with($Path, 'vendor/aws'));
+		$Output->Push(fn(string $Path)=> !str_starts_with($Path, 'vendor/google'));
+
+		return $Output;
 	}
 
 };
