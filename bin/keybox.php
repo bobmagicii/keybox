@@ -139,11 +139,11 @@ extends Console\Client {
 			?: $this->GetOption('path')
 			?: Common\Filesystem\Util::Pathify(
 				$this->GetUserPath('.ssh'),
-				'keybox.conf'
+				'keybox.hosts.conf'
 			)
 		);
 
-		Common\Dump::Var($Path);
+		$Conf = Local\HostConf::FromFile($Path);
 
 		return 0;
 	}
