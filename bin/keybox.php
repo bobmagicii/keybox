@@ -403,17 +403,14 @@ extends Console\Client {
 			$this->KeyRoot
 		);
 
-		$Index->Filter(
-			fn(string $P)
-			=> is_dir($P)
-		);
-
-		$Index->Remap(
+		($Index)
+		->Filter(fn(string $P)=> is_dir($P))
+		->Remap(
 			fn(string $P)
 			=> Common\Filesystem\Util::Basename($P)
-		);
-
-		$Index->Sort();
+		)
+		->Sort()
+		->Revalue();
 
 		return $Index;
 	}
