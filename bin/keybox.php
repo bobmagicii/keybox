@@ -492,7 +492,10 @@ extends Console\Client {
 
 		Common\Filesystem\Util::MkDir($Root);
 		copy($Pair->Private, $KeyPriv);
+		Common\Filesystem\Util::Chmod($KeyPriv, 0600);
+
 		copy($Pair->Public, $KeyPub);
+		Common\Filesystem\Util::Chmod($KeyPub, 0644);
 
 		$Conf = Local\KeyFileConf::New(
 			Filename: $KeyFile,
