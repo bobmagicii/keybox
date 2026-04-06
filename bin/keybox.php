@@ -145,6 +145,8 @@ extends Console\Client {
 
 		$Conf = Local\HostConf::FromFile($Path);
 
+		Common\Dump::Var($Conf->Hosts->Export());
+
 		return 0;
 	}
 
