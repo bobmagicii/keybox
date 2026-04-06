@@ -68,19 +68,26 @@ extends Common\Prototype {
 	Write(?string $Filename=NULL):
 	static {
 
+		$Buffer = new Common\Overbuffer;
+		$Key = NULL;
+		$Val = NULL;
+
 		if($Filename)
 		$this->Filename = $Filename;
 
-		$Buffer = new Common\Overbuffer;
+		////////
 
 		$Buffer->Start();
 		foreach($this->Hosts as $Key => $Val) {
 			/** @var HostItem $Val */
+
 			printf("Host %s%s", $Key, PHP_EOL);
 			printf("	IdentityFile %s%s", $Val->IdentityFile, PHP_EOL);
 			echo PHP_EOL;
 		}
 		$Buffer->Stop();
+
+		////////
 
 		file_put_contents($this->Filename, $Buffer->Get());
 
