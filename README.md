@@ -36,3 +36,10 @@ The main way to use this would be to edit `~/.ssh/config` to add the following t
 
 From then on you can use Keybox to manage the host configuration without having to hand edit the SSH config file.
 
+## Build Phar
+
+Build the Phar release from source...
+
+> php bin/keybox.php phar
+
+Afterwards you can put `build/keybox.phar` where ever it is needed.
