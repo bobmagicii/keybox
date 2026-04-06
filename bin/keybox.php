@@ -130,9 +130,9 @@ extends Console\Client {
 		return 0;
 	}
 
-	#[Console\Meta\Command('hosts')]
+	#[Console\Meta\Command('list')]
 	public function
-	CmdHosts():
+	CmdList():
 	int {
 
 		$Path = (FALSE
@@ -145,10 +145,119 @@ extends Console\Client {
 
 		$Conf = Local\HostConf::FromFile($Path);
 
-		Common\Dump::Var($Conf->Hosts->Export());
+		Console\Elements\H1::New(
+			Client: $this,
+			Text: $Conf->Filename,
+			Print: 2
+		);
+
+		Console\Elements\ListNamed::New(
+			Client: $this,
+			Items: (
+				$Conf->Hosts->Map(
+					fn(Local\HostItem $I)=> $I->IdentityFile)
+				->Export()
+			),
+			Print: 2
+		);
 
 		return 0;
 	}
+
+	#[Console\Meta\Command('set')]
+	#[Console\Meta\Arg('host')]
+	#[Console\Meta\Error(1, 'no host specified')]
+	public function
+	CmdSet():
+	int {
+
+		$Path = (FALSE
+			?: $this->GetOption('path')
+			?: Common\Filesystem\Util::Pathify(
+				$this->GetUserPath('.ssh'),
+				'keybox.hosts.conf'
+			)
+		);
+
+		$Host = $this->GetInput(1);
+
+		////////
+
+		if(!$Host)
+		$this->Quit(1);
+
+		$List = $this->FindInstalledKeys();
+		$Conf = Local\HostConf::FromFile($Path);
+
+		////////
+
+		Console\Elements\H2::New(
+			Client: $this,
+			Text: 'Choose Key-Pair for Host',
+			Print: 2
+		);
+
+		Console\Elements\ListOrdered::New(
+			Client: $this,
+			Items: $List->Export(),
+			Print: 2
+		);
+
+		$Choice = ((int)$this->Prompt('Enter Number:', '>') - 1);
+
+		if($Choice < 0) {
+			$this->PrintStatusMuted('no selection made');
+			return 0;
+		}
+
+		if(!$List->HasKey($Choice)) {
+			$this->PrintStatusMuted('invalid selection');
+			return 0;
+		}
+
+		$this->PrintStatusMuted(sprintf(
+			'Selected: %s',
+			$List->Get($Choice)
+		));
+
+		$Conf->Hosts[$Host] = new Local\HostItem([
+			'IdentityFile' => $this->GetKeyFilePrivate($List->Get($Choice))
+		]);
+
+		$Conf->Write();
+
+		return 0;
+	}
+
+	#[Console\Meta\Command('unset')]
+	#[Console\Meta\Arg('host')]
+	#[Console\Meta\Error(1, 'no host specified')]
+	public function
+	CmdUnset():
+	int {
+
+		$Path = (FALSE
+			?: $this->GetOption('path')
+			?: Common\Filesystem\Util::Pathify(
+				$this->GetUserPath('.ssh'),
+				'keybox.hosts.conf'
+			)
+		);
+
+		$Host = $this->GetInput(1);
+
+		////////
+
+		if(!$Host)
+		$this->Quit(1);
+
+		$Conf = Local\HostConf::FromFile($Path);
+		$Conf->Hosts->Remove($Host);
+		$Conf->Write();
+
+		return 0;
+	}
+
 
 	////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////
@@ -170,6 +279,28 @@ extends Console\Client {
 		return Common\Filesystem\Util::Pathify(
 			$this->AppRoot,
 			'keys'
+		);
+	}
+
+	protected function
+	GetKeyFilePrivate(string $KName):
+	string {
+
+		return Common\Filesystem\Util::Pathify(
+			$this->GetKeyRoot(),
+			$KName,
+			'key.priv'
+		);
+	}
+
+	protected function
+	GetKeyFilePublic(string $KName):
+	string {
+
+		return Common\Filesystem\Util::Pathify(
+			$this->GetKeyRoot(),
+			$KName,
+			'key.pub'
 		);
 	}
 
@@ -223,6 +354,24 @@ extends Console\Client {
 
 	////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////
+
+	public function
+	FindInstalledKeys():
+	Common\Datastore {
+
+		$Index = Common\Filesystem\Indexer::DatastoreFromPath(
+			$this->KeyRoot
+		);
+
+		$Index->Remap(
+			fn(string $P)
+			=> Common\Filesystem\Util::Basename($P)
+		);
+
+		$Index->Sort();
+
+		return $Index;
+	}
 
 	public function
 	FindKeyFilePairs(string $Path):

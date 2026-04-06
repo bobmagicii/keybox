@@ -61,6 +61,8 @@ extends Common\Prototype {
 
 		}
 
+		$this->Hosts->SortKeys();
+
 		return $this;
 	}
 
@@ -72,8 +74,12 @@ extends Common\Prototype {
 		$Key = NULL;
 		$Val = NULL;
 
+		////////
+
 		if($Filename)
 		$this->Filename = $Filename;
+
+		$this->Hosts->SortKeys();
 
 		////////
 
