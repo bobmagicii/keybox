@@ -130,6 +130,24 @@ extends Console\Client {
 		return 0;
 	}
 
+	#[Console\Meta\Command('hosts')]
+	public function
+	CmdHosts():
+	int {
+
+		$Path = (FALSE
+			?: $this->GetOption('path')
+			?: Common\Filesystem\Util::Pathify(
+				$this->GetUserPath('.ssh'),
+				'keybox.conf'
+			)
+		);
+
+		Common\Dump::Var($Path);
+
+		return 0;
+	}
+
 	////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////
 
