@@ -34,6 +34,8 @@ extends Console\Client {
 
 		parent::OnPrepare();
 
+		////////
+
 		$this->AppRoot = $this->GetOption('AppRoot');
 		$this->KeyRoot = $this->GetKeyRoot();
 
@@ -45,6 +47,8 @@ extends Console\Client {
 	void {
 
 		parent::OnReady();
+
+		////////
 
 		if(!is_dir($this->KeyRoot))
 		Common\Filesystem\Util::MkDir($this->KeyRoot);
@@ -72,15 +76,56 @@ extends Console\Client {
 		////////
 
 		$Found = $this->FindKeyFilePairs($Path);
+		$Found->Each(function(Local\KeyFilePair $Pair) {
 
-		Console\Elements\H2::New(
-			Client: $this,
-			Text: 'Files',
-			Print: 2
-		);
+			$Name = NULL;
+			$Force = FALSE;
 
-		Common\Dump::Var($this->KeyRoot);
-		Common\Dump::Var($Found->Export());
+			////////
+
+			Console\Elements\ListNamed::New(
+				Client: $this,
+				Items: [
+					'Private' => $Pair->Private,
+					'Public'  => $Pair->Public
+				],
+				Print: 2
+			);
+
+			$Name = $this->Prompt(
+				'Key Pair Name (blank to skip):',
+				'>'
+			);
+
+			if(!$Name) {
+				$this->PrintStatusMuted('Skipped');
+				return;
+			}
+
+			////////
+
+			InstallKeyPair: {{{
+				try {
+					$this->InstallKeyPair($Name, $Pair, $Force);
+					$this->PrintStatusMuted('Done');
+				}
+				catch(Common\Error\DirExists $Err) {
+					$Force = $this->PromptBool(
+						'Key Pair Exists. Overwrite? [y/n]',
+						'>'
+					);
+
+					if(!$Force) {
+						$this->PrintStatusMuted('Skipped');
+						return;
+					}
+
+					goto InstallKeyPair;
+				}
+			}}};
+
+			return;
+		});
 
 		return 0;
 	}
@@ -215,23 +260,30 @@ extends Console\Client {
 	////////////////////////////////////////////////////////////////
 
 	protected function
-	InstallKeyPair(string $Name, array $Pair):
+	InstallKeyPair(string $Name, Local\KeyFilePair $Pair, bool $Force=FALSE):
 	void {
 
-		if(count($Pair) !== 2)
-		throw new Exception('invalid pair');
+		$Key = Common\Filters\Text::SlottableKey($Name);
+		$Root = Common\Filesystem\Util::Pathify($this->KeyRoot, $Key);
+		$KeyFile = Common\Filesystem\Util::Pathify($Root, 'key.json');
+		$KeyPriv = Common\Filesystem\Util::Pathify($Root, 'key.priv');
+		$KeyPub = Common\Filesystem\Util::Pathify($Root, 'key.pub');
 
 		////////
 
-		$Path = Common\Filesystem\Util::Pathify(
-			$this->KeyRoot,
-			$Name
-		);
+		if(is_dir($Root) && !$Force)
+		throw new Common\Error\DirExists($Root);
 
-		Common\Filesystem\Util::MkDir($Path);
-		copy($Pair[0], Common\Filesystem\Util::Pathify($Path, 'key.priv'));
-		copy($Pair[1], Common\Filesystem\Util::Pathify($Path, 'key.pub'));
-		Local\KeyFileConf::Touch(Common\Filesystem\Util::Pathify($Path, 'key.json'));
+		////////
+
+		Common\Filesystem\Util::MkDir($Root);
+		copy($Pair->Private, $KeyPriv);
+		copy($Pair->Public, $KeyPub);
+
+		$Conf = Local\KeyFileConf::New(
+			Filename: $KeyFile,
+			Name: $Name
+		);
 
 		return;
 	}
