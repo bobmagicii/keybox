@@ -34,3 +34,5 @@ The main way to use this would be to edit `~/.ssh/config` to add the following t
 
 `Include /path/to/keys/hosts.conf`
 
+From then on you can use Keybox to manage the host configuration without having to hand edit the SSH config file.
+
